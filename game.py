@@ -1,4 +1,7 @@
-# Basic arcade OOP
+# -------------------------------------------
+#           MORETINI INVADERS
+# -------------------------------------------
+# game based on Python Arcade
 
 import arcade as ar
 import random as rn
@@ -21,17 +24,129 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     os.chdir(sys._MEIPASS)
 
 
-class MoretiniInvaders(ar.Window):
+class MenuView(ar.View):
+    def on_show(self):
+        ar.set_background_color(ar.color.JAPANESE_VIOLET)
+
+    def on_draw(self):
+        self.clear()
+        ar.draw_text("Moretini Invaders", SCREEN_WIDTH/2, SCREEN_HEIGHT*3/4,
+                     ar.color.WHITE, font_size=25, anchor_x="center",
+                     font_name="Kenney Rocket")
+
+        txt = ("Once upon a time in a galaxy far, far away the "
+               "Moretinians were facing extinction.\n\nAs a commander "
+               "of the resistance force you were tasked to extract them "
+               "to safety.")
+        
+        ar.draw_text(txt,
+                     50, SCREEN_HEIGHT/2 + 100,
+                     ar.color.WHITE, 16,
+                     multiline=True, width=(SCREEN_WIDTH-100))
+
+        ar.draw_text("Press any key to continue.",
+                     SCREEN_WIDTH/2, 150,
+                     ar.color.KELLY_GREEN, font_size=14, anchor_x="center")
+
+    def on_key_press(self, symbol, modifiers):
+        instructions_view = InstructionView()
+        self.window.show_view(instructions_view)
+
+
+class InstructionView(ar.View):
+    def on_show(self):
+        ar.set_background_color(ar.color.JAPANESE_VIOLET)
+
+    def on_draw(self):
+        self.clear()
+        ar.draw_text("Moretini Invaders", SCREEN_WIDTH/2, SCREEN_HEIGHT*3/4,
+                     ar.color.WHITE, font_size=25, anchor_x="center",
+                     font_name="Kenney Rocket")
+
+        txt = ("Your job is to fly through the meteor shower and plasma "
+               "clouds to reach Vesoljska Gorica on planet Plimius.\n\n"
+               "Use navigation keys to move your space vessel around and "
+               "space bar to activate your lase gun.\n\nGood luck, commander!")
+        
+        ar.draw_text(txt,
+                     50, SCREEN_HEIGHT/2 + 100,
+                     ar.color.WHITE, 16,
+                     multiline=True, width=(SCREEN_WIDTH-100))
+
+        ar.draw_text("Press any key to continue.",
+                     SCREEN_WIDTH/2, 150,
+                     ar.color.KELLY_GREEN, font_size=14, anchor_x="center")
+
+    def on_key_press(self, symbol, modifiers):
+        game_view = MoretiniInvaders()
+        game_view.setup()
+        self.window.show_view(game_view)
+
+
+class GameOverView(ar.View):
+    def __init__(self):
+        super().__init__()
+        self.time_taken = 0
+        self.message = ""
+
+    def on_show(self):
+        ar.set_background_color(ar.color.JAPANESE_VIOLET)
+        messages = ["You suck.", "You've become a space rascal!",
+                    "You are such a failure.", "You have failed.",
+                    "Try better next time.",
+                    "How incompetent can you really be?",
+                    "You are a disgrace for humanity.",
+                    "You will be court martialed."]
+        select = rn.randint(0, len(messages) - 1)
+        self.message = messages[select]
+
+    def on_draw(self):
+        self.clear()
+        """
+        Draw "Game over" across the screen.
+        """
+        ar.draw_text("GAME OVER", SCREEN_WIDTH/2, SCREEN_HEIGHT*3/4,
+                     ar.color.WHITE, font_size=25, anchor_x="center",
+                     font_name="Kenney Rocket")
+
+        ar.draw_text(self.message,
+                     SCREEN_WIDTH/2, SCREEN_HEIGHT/2, ar.color.WHITE,
+                     font_size=18, anchor_x="center")
+
+        ar.draw_text("All Moretinians were massacred.",
+                     SCREEN_WIDTH/2, SCREEN_HEIGHT/2-35, ar.color.WHITE,
+                     font_size=18, anchor_x="center")
+
+        ar.draw_text("Press enter to restart.",
+                     SCREEN_WIDTH/2, 150,
+                     ar.color.KELLY_GREEN, font_size=14, anchor_x="center")
+
+        time_taken_formatted = f"{round(self.time_taken, 2)} seconds"
+        ar.draw_text(f"Terminated in: {time_taken_formatted}",
+                     20, 45, ar.color.DUST_STORM,
+                     font_size=12)
+
+        output_total = f"Total meteors shot: {self.window.total_score}"
+        ar.draw_text(output_total, 20, 20, ar.color.DUST_STORM, 12)
+
+    def on_key_press(self, symbol, modifiers):
+        if symbol == ar.key.ENTER:
+            game_view = MoretiniInvaders()
+            game_view.setup()
+            self.window.show_view(game_view)
+
+
+class MoretiniInvaders(ar.View):
     ''' Moretini Invaders is a 2D space shooting game.
     This is the main class.
     '''
     
-    def __init__(self, width, height, title):
+    def __init__(self):
         ''' Initialise the game.
         '''
 
         # Call superclass constructor
-        super().__init__(width, height, title)
+        super().__init__()
 
         # Setup empty sprite lists
         self.meteor_list = ar.SpriteList()
@@ -52,12 +167,15 @@ class MoretiniInvaders(ar.Window):
         # Define score
         self.score = 0
 
+        # Define timer
+        self.timer = 0
+
         # Set background
         ar.set_background_color(ar.color.ENGLISH_VIOLET)
 
         # Setup the player
         self.player = ar.Sprite('data/image/blue_ship.png', SCALING_PLAYER)
-        self.player.center_x = self.height / 2
+        self.player.center_x = SCREEN_HEIGHT / 2
         self.player.bottom = 10
 
         # Spawn new meteors
@@ -78,7 +196,7 @@ class MoretiniInvaders(ar.Window):
         # Load sounds
         self.laser_sound = ar.sound.load_sound('data/sound/laser2.wav')
         self.explosion_sound = ar.sound.load_sound('data/sound/explosion2.wav')
-
+        self.game_over_sound = ar.sound.load_sound('data/sound/gameover4.wav')
 
     def add_meteor(self, delta_time: float):
         ''' Adds a new meteor to the scene. Input is how much
@@ -92,8 +210,8 @@ class MoretiniInvaders(ar.Window):
         meteor = FlyingSprite('data/image/meteor_medium.png', scale)
 
         # Set meteor position on top and off screen
-        meteor.bottom = rn.randint(self.height, self.height + 80)
-        meteor.left = rn.randint(10, self.width - 10)
+        meteor.bottom = rn.randint(SCREEN_HEIGHT, SCREEN_HEIGHT + 80)
+        meteor.left = rn.randint(10, SCREEN_WIDTH - 10)
 
         # Set meteor velocity
         meteor.velocity = (rn.randint(-3, 3), rn.randint(-15, -5))
@@ -115,8 +233,8 @@ class MoretiniInvaders(ar.Window):
                               flipped_vertically=True)
 
         # Set plasma cloud positions
-        plasma.bottom = rn.randint(self.height, self.height + 80)
-        plasma.left = rn.randint(10, self.width - 10)
+        plasma.bottom = rn.randint(SCREEN_HEIGHT, SCREEN_HEIGHT + 80)
+        plasma.left = rn.randint(10, SCREEN_WIDTH - 10)
 
         # Set plasma cloud velocity
         plasma.velocity = (0, rn.randint(-20, -10))
@@ -128,17 +246,28 @@ class MoretiniInvaders(ar.Window):
         ''' Update positions and status of all game objects.
         '''
 
+        # Update time
+        self.timer += delta_time
+
         # If paused, don't update
         if self.paused:
             return
 
         # Has the player been hit by a meteor
         if self.player.collides_with_list(self.meteor_list):
-            ar.close_window()
+            ar.sound.play_sound(self.game_over_sound)
+            game_over_view = GameOverView()
+            game_over_view.time_taken = self.timer
+            self.window.set_mouse_visible(True)
+            self.window.show_view(game_over_view)
 
         # Has the player been hit by the plasma cloud
         if self.player.collides_with_list(self.plasma_list):
-            ar.close_window()
+            ar.sound.play_sound(self.game_over_sound)
+            game_over_view = GameOverView()
+            game_over_view.time_taken = self.timer
+            self.window.set_mouse_visible(True)
+            self.window.show_view(game_over_view)
 
         # Check and update laser hits
         self.trigger_laser_hits()
@@ -151,11 +280,11 @@ class MoretiniInvaders(ar.Window):
         self.explosions_list.update()
 
         # Keep the player on the screen
-        if self.player.top > self.height:
-            self.player.top = self.height
+        if self.player.top > SCREEN_HEIGHT:
+            self.player.top = SCREEN_HEIGHT
 
-        if self.player.right > self.width:
-            self.player.right = self.width
+        if self.player.right > SCREEN_WIDTH:
+            self.player.right = SCREEN_WIDTH
 
         if self.player.bottom < 0:
             self.player.bottom = 0
@@ -198,12 +327,13 @@ class MoretiniInvaders(ar.Window):
                 # Remove from lists and update score
                 meteor.remove_from_sprite_lists()
                 self.score += 1
+                self.window.total_score += 1
 
                 # Play hit sound
                 ar.sound.play_sound(self.explosion_sound)
 
             # Remove laser if off screen
-            if laser.bottom > self.height:
+            if laser.bottom > SCREEN_HEIGHT:
                 laser.remove_from_sprite_lists()
 
     def on_draw(self):
@@ -333,8 +463,10 @@ def main():
     ''' Run the main code here.
     '''
 
-    game = MoretiniInvaders(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
-    game.setup()
+    window = ar.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+    window.total_score = 0
+    menu_view = MenuView()
+    window.show_view(menu_view)
     ar.run()
 
 
