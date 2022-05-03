@@ -1,0 +1,9 @@
+# Ignore files
+*.spec
+*.sublime-project
+*.sublime-workspace
+
+# Ignore folders
+**/spaceshooter
+**/build
+**/dist
