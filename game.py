@@ -1,10 +1,12 @@
 # -------------------------------------------
 #           MORETINI INVADERS
 # -------------------------------------------
-# game based on Python Arcade
+# Game based on Python Arcade.
+# Artwork from https://kenney.nl
 
 import arcade as ar
 import random as rn
+import copy
 import sys
 import os
 
@@ -64,9 +66,9 @@ class InstructionView(ar.View):
                      font_name="Kenney Rocket")
 
         txt = ("Your job is to fly through the meteor shower and plasma "
-               "clouds to reach Vesoljska Gorica on planet Plimius.\n\n"
+               "clouds to reach New London on planet Plimius.\n\n"
                "Use navigation keys to move your space vessel around and "
-               "space bar to activate your lase gun.\n\nGood luck, commander!")
+               "space bar to activate your laser gun.\n\nGood luck, commander!")
         
         ar.draw_text(txt,
                      50, SCREEN_HEIGHT/2 + 100,
@@ -91,7 +93,7 @@ class GameOverView(ar.View):
 
     def on_show(self):
         ar.set_background_color(ar.color.JAPANESE_VIOLET)
-        messages = ["You suck.", "You've become a space rascal!",
+        messages = ["You suck.", "Your performance is unacceptable.",
                     "You are such a failure.", "You have failed.",
                     "Try better next time.",
                     "How incompetent can you really be?",
@@ -178,6 +180,11 @@ class MoretiniInvaders(ar.View):
         self.player.center_x = SCREEN_HEIGHT / 2
         self.player.bottom = 10
 
+        # Setup bullet
+        self.laser = ar.Sprite('data/image/laserBlue01.png', SCALING_LASER)
+        self.laser.angle = 90
+        self.laser.change_y = VELOCITY_LASER
+
         # Spawn new meteors
         ar.schedule(self.add_meteor, 0.35)
 
@@ -255,19 +262,11 @@ class MoretiniInvaders(ar.View):
 
         # Has the player been hit by a meteor
         if self.player.collides_with_list(self.meteor_list):
-            ar.sound.play_sound(self.game_over_sound)
-            game_over_view = GameOverView()
-            game_over_view.time_taken = self.timer
-            self.window.set_mouse_visible(True)
-            self.window.show_view(game_over_view)
+            self.trigger_game_over()
 
         # Has the player been hit by the plasma cloud
         if self.player.collides_with_list(self.plasma_list):
-            ar.sound.play_sound(self.game_over_sound)
-            game_over_view = GameOverView()
-            game_over_view.time_taken = self.timer
-            self.window.set_mouse_visible(True)
-            self.window.show_view(game_over_view)
+            self.trigger_game_over()
 
         # Check and update laser hits
         self.trigger_laser_hits()
@@ -291,6 +290,15 @@ class MoretiniInvaders(ar.View):
 
         if self.player.left < 0:
             self.player.left = 0
+
+    def trigger_game_over(self):
+        ''' Actions to trigger before game over.
+        '''
+
+        ar.sound.play_sound(self.game_over_sound)
+        game_over_view = GameOverView()
+        game_over_view.time_taken = self.timer
+        self.window.show_view(game_over_view)
 
     def trigger_laser_hits(self):
         ''' Check collision for all laser shots and trigger explosions.
@@ -383,20 +391,14 @@ class MoretiniInvaders(ar.View):
         # Play sound
         ar.sound.play_sound(self.laser_sound)
 
-        # Create a bullet
-        laser = ar.Sprite('data/image/laserBlue01.png', SCALING_LASER)
-
-        # Rotate image
-        laser.angle = 90
-
-        # Setup speed
-        laser.change_y = VELOCITY_LASER
+        # Reference laser sprite
+        laser = copy.deepcopy(self.laser)
 
         # Position the laser
         laser.center_x = self.player.center_x
         laser.bottom = self.player.top
 
-        # Add laser to lists
+        # Copy laser to lists
         self.laser_list.append(laser)
 
     def on_key_release(self, symbol: int, modifiers: int):
