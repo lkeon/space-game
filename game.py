@@ -20,6 +20,14 @@ SCALING_PLASMA = 0.5
 SCALING_LASER = 0.5
 VELOCITY_LASER = 5
 
+TIME_LEVEL = 20
+TIME_ADD = 5
+SPAWN_METEOR = 0.75
+SPAWN_PLASMA = 1.5
+SPAWN_SCALE = 1.01
+VELOCITY_FACTOR = 0.6
+LEVEL_FACTOR = 1.1
+
 
 # Include this for pyinstaller
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
@@ -125,6 +133,76 @@ class GameOverView(ar.View):
 
         time_taken_formatted = f"{round(self.time_taken, 2)} seconds"
         ar.draw_text(f"Terminated in: {time_taken_formatted}",
+                     20, 70, ar.color.DUST_STORM,
+                     font_size=12)
+
+        output_total = f"Total meteors shot: {self.window.total_score}"
+        ar.draw_text(output_total, 20, 45, ar.color.DUST_STORM, 12)
+
+        level = f"Max level reached: {self.window.current_level - 1}"
+        ar.draw_text(level, 20, 20, ar.color.DUST_STORM, 12)
+
+    def on_key_press(self, symbol, modifiers):
+        if symbol == ar.key.ENTER:
+
+            self.window.total_score = 0
+            self.window.current_level = 1
+            self.window.current_level_factor = 1
+            self.window.level_duration = TIME_LEVEL
+            self.window.current_spawn_factor = SPAWN_SCALE
+
+            game_view = MoretiniInvaders()
+            game_view.setup()
+            self.window.show_view(game_view)
+
+
+class NextLevelView(ar.View):
+    def __init__(self):
+        super().__init__()
+        self.time_taken = 0
+
+    def on_show(self):
+        ar.set_background_color(ar.color.JAPANESE_VIOLET)
+        messages = ["Excellent job!",
+                    "Hero of the Space Union!",
+                    "Keep up with good work!",
+                    "Well done!",
+                    "Your courage is exemplary.",
+                    "Your gallantry will be awarded!",
+                    "Ditinguisged Flying Cross earned!"]
+        select = rn.randint(0, len(messages) - 1)
+        self.message = messages[select]
+
+    def on_draw(self):
+        self.clear()
+        """
+        Draw "Game over" across the screen.
+        """
+        level = str(self.window.current_level)
+        ar.draw_text("LEVEL " + level,
+                     SCREEN_WIDTH/2, SCREEN_HEIGHT*3/4,
+                     ar.color.WHITE, font_size=25, anchor_x="center",
+                     font_name="Kenney Rocket")
+
+        ar.draw_text("COMPLETED",
+                     SCREEN_WIDTH/2, SCREEN_HEIGHT*3/4 - 40,
+                     ar.color.WHITE, font_size=25, anchor_x="center",
+                     font_name="Kenney Rocket")
+
+        ar.draw_text(self.message,
+                     SCREEN_WIDTH/2, SCREEN_HEIGHT/2, ar.color.WHITE,
+                     font_size=18, anchor_x="center")
+
+        ar.draw_text("Moretinians are awaiting rescue.",
+                     SCREEN_WIDTH/2, SCREEN_HEIGHT/2-35, ar.color.WHITE,
+                     font_size=18, anchor_x="center")
+
+        ar.draw_text("Press enter to continue.",
+                     SCREEN_WIDTH/2, 150,
+                     ar.color.KELLY_GREEN, font_size=14, anchor_x="center")
+
+        time_taken_formatted = f"{round(self.time_taken, 2)} seconds"
+        ar.draw_text(f"Finished in: {time_taken_formatted}",
                      20, 45, ar.color.DUST_STORM,
                      font_size=12)
 
@@ -133,6 +211,12 @@ class GameOverView(ar.View):
 
     def on_key_press(self, symbol, modifiers):
         if symbol == ar.key.ENTER:
+
+            self.window.current_level += 1
+            self.window.current_level_factor *= LEVEL_FACTOR
+            self.window.current_spawn_factor *= SPAWN_SCALE
+            self.window.level_duration += TIME_ADD
+
             game_view = MoretiniInvaders()
             game_view.setup()
             self.window.show_view(game_view)
@@ -166,6 +250,10 @@ class MoretiniInvaders(ar.View):
         # Define paused
         self.paused = False
 
+        # Progression level factors
+        self.vel_fact = VELOCITY_FACTOR * self.window.current_level_factor
+        self.time_level = self.window.level_duration
+
         # Define score
         self.score = 0
 
@@ -186,10 +274,12 @@ class MoretiniInvaders(ar.View):
         self.laser.change_y = VELOCITY_LASER
 
         # Spawn new meteors
-        ar.schedule(self.add_meteor, 0.35)
+        spawn_time = SPAWN_METEOR / self.window.current_spawn_factor
+        ar.schedule(self.add_meteor, spawn_time)
 
         # Spawn a new plasma cloud
-        ar.schedule(self.add_plasma_cloud, 1.5)
+        spawn_time = SPAWN_PLASMA / self.window.current_spawn_factor
+        ar.schedule(self.add_plasma_cloud, spawn_time)
 
         # Load explosion texture
         pth = 'data/image/explosion.png'
@@ -204,6 +294,7 @@ class MoretiniInvaders(ar.View):
         self.laser_sound = ar.sound.load_sound('data/sound/laser2.wav')
         self.explosion_sound = ar.sound.load_sound('data/sound/explosion2.wav')
         self.game_over_sound = ar.sound.load_sound('data/sound/gameover4.wav')
+        self.next_level_sound = ar.sound.load_sound('data/sound/upgrade3.wav')
 
     def add_meteor(self, delta_time: float):
         ''' Adds a new meteor to the scene. Input is how much
@@ -221,7 +312,8 @@ class MoretiniInvaders(ar.View):
         meteor.left = rn.randint(10, SCREEN_WIDTH - 10)
 
         # Set meteor velocity
-        meteor.velocity = (rn.randint(-3, 3), rn.randint(-15, -5))
+        meteor.velocity = (self.vel_fact * rn.randint(-3, 3),
+                           self.vel_fact * rn.randint(-10, -5))
 
         # Add to the meteor list
         self.meteor_list.append(meteor)
@@ -244,7 +336,7 @@ class MoretiniInvaders(ar.View):
         plasma.left = rn.randint(10, SCREEN_WIDTH - 10)
 
         # Set plasma cloud velocity
-        plasma.velocity = (0, rn.randint(-20, -10))
+        plasma.velocity = (0, self.vel_fact * rn.randint(-12, -10))
 
         # Add to the plasma list
         self.plasma_list.append(plasma)
@@ -267,6 +359,10 @@ class MoretiniInvaders(ar.View):
         # Has the player been hit by the plasma cloud
         if self.player.collides_with_list(self.plasma_list):
             self.trigger_game_over()
+
+        # Check if time has passed to progress to next level
+        if self.timer >= self.time_level:
+            self.trigger_next_level()
 
         # Check and update laser hits
         self.trigger_laser_hits()
@@ -299,6 +395,16 @@ class MoretiniInvaders(ar.View):
         game_over_view = GameOverView()
         game_over_view.time_taken = self.timer
         self.window.show_view(game_over_view)
+
+    def trigger_next_level(self):
+        ''' Progress to the next level.
+        '''
+
+        ar.sound.play_sound(self.next_level_sound)
+        next_level_view = NextLevelView()
+        next_level_view.time_taken = self.timer
+        self.window.show_view(next_level_view)
+
 
     def trigger_laser_hits(self):
         ''' Check collision for all laser shots and trigger explosions.
@@ -467,6 +573,10 @@ def main():
 
     window = ar.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
     window.total_score = 0
+    window.current_level = 1
+    window.current_level_factor = 1
+    window.current_spawn_factor = SPAWN_SCALE
+    window.level_duration = TIME_LEVEL
     menu_view = MenuView()
     window.show_view(menu_view)
     ar.run()
